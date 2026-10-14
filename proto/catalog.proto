@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package catalog.v1;
+
+// Shared error payload. `type` is a short machine-readable code, not the gRPC
+// status itself (the gRPC status code is what actually drives the edge's
+// HTTP mapping; this is for client-facing explanation).
+message CatalogError {
+  string type = 1; // "INVALID_ARGUMENT" | "NOT_FOUND" | "UNAVAILABLE" | "INTERNAL"
+  string message = 2;
+}
+
+// Every RPC response is wrapped the same way: status + error + data.
+// status mirrors the gRPC status code (0 = OK) so the edge has exactly one
+// place to look, whether the failure came back as a well-formed envelope or
+// as a thrown RpcException.
+message PageInfo {
+  int32 page = 1;
+  int32 limit = 2;
+  int32 total = 3;
+  bool has_next = 4;
+}
+
+message Work {
+  string id = 1;
+  string title = 2;
+  repeated string authors = 3;   // [] when the upstream omitted author_name
+  int32 first_publish_year = 4;  // 0 when unknown
+  string cover_url = 5;          // "" when there is no cover (missing or -1 sentinel)
+}
+
+message WorkDetail {
+  string id = 1;
+  string title = 2;
+  repeated string authors = 3;
+  string description = 4;        // always a flat string; upstream's string/{type,value} shapes collapse here
+  repeated string subjects = 5;
+  string cover_url = 6;
+}
+
+message Edition {
+  string id = 1;
+  string title = 2;
+  string publish_date = 3;       // "" when unknown
+  repeated string publishers = 4;
+}
+
+message SearchRequest {
+  string q = 1;
+  int32 page = 2;
+  int32 limit = 3;
+}
+
+message SearchData {
+  repeated Work results = 1;
+  PageInfo page = 2;
+}
+
+message SearchResponse {
+  int32 status = 1;
+  CatalogError error = 2;
+  SearchData data = 3;
+}
+
+message GetWorkRequest {
+  string id = 1;
+}
+
+message WorkResponse {
+  int32 status = 1;
+  CatalogError error = 2;
+  WorkDetail data = 3;
+}
+
+message GetWorkEditionsRequest {
+  string work_id = 1;
+  int32 page = 2;
+  int32 limit = 3;
+}
+
+message EditionsData {
+  repeated Edition editions = 1;
+  PageInfo page = 2;
+}
+
+message EditionsResponse {
+  int32 status = 1;
+  CatalogError error = 2;
+  EditionsData data = 3;
+}
+
+service CatalogService {
+  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc GetWork(GetWorkRequest) returns (WorkResponse);
+  rpc GetWorkEditions(GetWorkEditionsRequest) returns (EditionsResponse);
+}
